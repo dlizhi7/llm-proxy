@@ -4,10 +4,11 @@ import os
 
 
 ALLOWED_REQUEST_FIELDS = {
-    "model", "messages", "stream", "temperature", "top_p", "n",
-    "max_tokens", "max_completion_tokens", "stop", "frequency_penalty",
-    "presence_penalty", "tools", "tool_choice", "parallel_tool_calls",
-    "response_format", "seed", "user", "logprobs", "top_logprobs",
+    "model", "messages", "stream", "stream_options", "temperature",
+    "top_p", "n", "max_tokens", "max_completion_tokens", "stop",
+    "frequency_penalty", "presence_penalty", "tools", "tool_choice",
+    "parallel_tool_calls", "response_format", "seed", "user",
+    "logprobs", "top_logprobs",
 }
 
 
