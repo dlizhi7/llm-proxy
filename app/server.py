@@ -11,7 +11,13 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from app.core.logging_config import get_logger
 from app.core.settings import Settings
 from app.services.key_pool import ApiKeyPool, is_rate_limit_error
-from app.services.payloads import normalize_json, parse_json_response, rewrite_response_model, sanitize_request_body
+from app.services.payloads import (
+    SanitizedBody,
+    normalize_json,
+    parse_json_response,
+    rewrite_response_model,
+    sanitize_request_body,
+)
 from app.services.reasoning_store import ReasoningStore
 
 
@@ -131,6 +137,8 @@ def create_app() -> FastAPI:
     async def stream_deepseek_response(
         body: dict[str, Any],
         cursor_model: str,
+        session_hash: str,
+        assistant_position: int,
         t0: float = 0,
     ):
         attempts = max(1, key_pool.count)
@@ -183,14 +191,21 @@ def create_app() -> FastAPI:
                             payload = line.removeprefix("data: ").strip()
                             if payload == "[DONE]":
                                 for state in stream_states.values():
-                                    reasoning_store.cache_message(build_streamed_message(state))
+                                    built = build_streamed_message(state)
+                                    reasoning_store.cache_message(built)
+                                    reasoning_store.cache_position(
+                                        session_hash, assistant_position,
+                                        built.get("reasoning_content", ""),
+                                    )
 
                                 if t0:
                                     logger.info(
-                                        "stream_done model=%s elapsed=%.1fs reasoning_cache=%d",
+                                        "stream_done model=%s elapsed=%.1fs reasoning_cache=%d pos=%s:%d",
                                         cursor_model,
                                         time.monotonic() - t0,
                                         reasoning_store.size(),
+                                        session_hash,
+                                        assistant_position,
                                     )
 
                                 yield "data: [DONE]\n\n"
@@ -236,22 +251,26 @@ def create_app() -> FastAPI:
         try:
             body = await request.json()
             cursor_model = body.get("model") or settings.proxy_model_name
-            deepseek_body, stats = sanitize_request_body(body, settings, reasoning_store, logger)
+            san = sanitize_request_body(body, settings, reasoning_store, logger)
         except Exception as exc:
             return JSONResponse(status_code=400, content={"error": {"message": str(exc)}})
 
         logger.info(
             "req model=%s stream=%s msgs=%d tools=%d reasoning_inject=%s",
             cursor_model,
-            deepseek_body.get("stream", False),
-            len(deepseek_body.get("messages", [])),
-            len(deepseek_body.get("tools", [])),
-            stats,
+            san.body.get("stream", False),
+            len(san.body.get("messages", [])),
+            len(san.body.get("tools", [])),
+            san.stats,
         )
 
-        if deepseek_body.get("stream"):
+        if san.body.get("stream"):
             return StreamingResponse(
-                stream_deepseek_response(deepseek_body, cursor_model, t0),
+                stream_deepseek_response(
+                    san.body, cursor_model,
+                    san.session_hash, san.assistant_position,
+                    t0,
+                ),
                 media_type="text/event-stream",
                 headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
             )
@@ -276,7 +295,7 @@ def create_app() -> FastAPI:
                     response = await client.post(
                         settings.deepseek_url("/chat/completions"),
                         headers=headers,
-                        json=deepseek_body,
+                        json=san.body,
                     )
                 except httpx.HTTPError as exc:
                     return JSONResponse(status_code=502, content={"error": {"message": str(exc)}})
@@ -296,14 +315,20 @@ def create_app() -> FastAPI:
         for choice in last_data.get("choices", []):
             message = choice.get("message") or {}
             reasoning_store.cache_message(message)
+            reasoning_store.cache_position(
+                san.session_hash, san.assistant_position,
+                message.get("reasoning_content", ""),
+            )
 
         logger.info(
-            "res model=%s status=%d elapsed=%.1fs tokens=%s reasoning_cache=%d",
+            "res model=%s status=%d elapsed=%.1fs tokens=%s reasoning_cache=%d pos=%s:%d",
             cursor_model,
             last_status,
             time.monotonic() - t0,
             last_data.get("usage", {}).get("total_tokens", "?"),
             reasoning_store.size(),
+            san.session_hash,
+            san.assistant_position,
         )
 
         return JSONResponse(content=rewrite_response_model(last_data, cursor_model))

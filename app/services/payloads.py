@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from logging import Logger
 from typing import Any
 
@@ -38,13 +39,24 @@ def normalize_cursor_tools(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return normalized
 
 
+@dataclass
+class SanitizedBody:
+    body: dict[str, Any]
+    stats: dict[str, int]
+    session_hash: str
+    assistant_position: int
+
+
 def sanitize_request_body(
     body: dict[str, Any],
     settings: Settings,
     reasoning_store: ReasoningStore,
     logger: Logger,
-) -> tuple[dict[str, Any], dict[str, int]]:
-    """Prepare a provider-safe body while preserving key chat behavior."""
+) -> SanitizedBody:
+    """Prepare a provider-safe body while preserving key chat behavior.
+
+    Returns a SanitizedBody with session/position info for later caching.
+    """
     sanitized: dict[str, Any] = {}
     stripped: list[str] = []
 
@@ -63,12 +75,18 @@ def sanitize_request_body(
     if not isinstance(messages, list):
         raise ValueError("request body field 'messages' must be a list")
 
-    sanitized["messages"], stats = reasoning_store.inject_into_messages(messages)
+    patched_msgs, stats, session_hash, next_pos = reasoning_store.inject_into_messages(messages)
+    sanitized["messages"] = patched_msgs
 
     if stripped:
         logger.info("stripped unknown request fields: %s", stripped)
 
-    return sanitized, stats
+    return SanitizedBody(
+        body=sanitized,
+        stats=stats,
+        session_hash=session_hash,
+        assistant_position=next_pos,
+    )
 
 
 def rewrite_response_model(data: dict[str, Any], cursor_model: str) -> dict[str, Any]:
