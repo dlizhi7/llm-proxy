@@ -19,6 +19,10 @@ llm-proxy/
 ├── run.sh                      # 一键启动脚本
 ├── test_proxy.sh               # 升级后回归检查脚本
 ├── .env.example                # 配置模板
+├── docker-compose.yml          # 代理 + Cloudflare 隧道
+├── cloudflared/
+│   ├── config.example.yml      # 固定域名方案模板（当前默认不用）
+│   └── README.md               # 临时隧道与升级说明
 └── requirements.txt
 ```
 
@@ -43,6 +47,54 @@ cp .env.example .env
 
 ```bash
 curl http://localhost:8080/health
+```
+
+## Docker 部署
+
+### 仅代理
+
+```bash
+cd /home/lychee/workspace/llm-proxy
+docker build -t llm-proxy:latest .
+docker compose up -d llm-proxy
+docker compose logs -f llm-proxy
+```
+
+会读取项目根目录的 `.env`，本机访问 `http://127.0.0.1:8080`。
+
+### 代理 + Cloudflare 临时公网（当前默认）
+
+无需 Cloudflare 账号或 DNS，使用 Quick Tunnel（`*.trycloudflare.com`）。域名审批通过后再改固定域名，见 [cloudflared/README.md](cloudflared/README.md)。
+
+```bash
+docker compose up -d
+docker compose logs -f cloudflared
+```
+
+从日志复制临时 HTTPS 地址，Cursor Base URL 填 `https://<临时域名>/v1`。
+
+提取地址（可选）：
+
+```bash
+docker compose logs cloudflared 2>&1 | grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' | head -1
+```
+
+**注意**：重建 `cloudflared` 容器后临时 URL 可能变化，需更新 Cursor 配置。
+
+仅启动代理、不启隧道：
+
+```bash
+docker compose up -d llm-proxy
+```
+
+### 手动 docker run（可选）
+
+```bash
+docker run -d --name llm-proxy \
+  --restart unless-stopped \
+  -p 8080:8080 \
+  --env-file .env \
+  llm-proxy:latest
 ```
 
 ## Cursor 配置

@@ -1,0 +1,14 @@
+# NOT used by default compose (Quick Tunnel). For fixed domain after DNS is ready:
+#
+#   cp cloudflared/config.example.yml cloudflared/config.yml
+#   cp ~/.cloudflared/<TUNNEL_ID>.json cloudflared/credentials.json
+# Then switch cloudflared service in docker-compose.yml to named-tunnel mode
+# (see cloudflared/README.md).
+
+tunnel: YOUR_TUNNEL_ID
+credentials-file: /etc/cloudflared/credentials.json
+
+ingress:
+  - hostname: llm-proxy.example.com
+    service: http://llm-proxy:8080
+  - service: http_status:404

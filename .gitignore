@@ -1,4 +1,6 @@
 .env
+cloudflared/credentials.json
+cloudflared/config.yml
 .venv/
 __pycache__/
 *.pyc

@@ -1,0 +1,20 @@
+services:
+  llm-proxy:
+    build: .
+    image: llm-proxy:latest
+    container_name: llm-proxy
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+
+  # Quick Tunnel: random *.trycloudflare.com URL on each container recreate.
+  # See cloudflared/README.md for switching to a fixed domain later.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate --url http://llm-proxy:8080
+    depends_on:
+      - llm-proxy
