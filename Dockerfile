@@ -4,6 +4,7 @@ WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
+    TZ=Asia/Shanghai \
     PORT=8080
 
 # Install runtime dependencies first for better layer caching.
