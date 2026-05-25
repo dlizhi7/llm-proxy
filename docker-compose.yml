@@ -8,6 +8,18 @@ services:
       - "8080:8080"
     env_file:
       - .env
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=5)",
+        ]
+      interval: 120s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
 
   # Quick Tunnel: random *.trycloudflare.com URL on each container recreate.
   # See cloudflared/README.md for switching to a fixed domain later.
@@ -17,4 +29,5 @@ services:
     restart: unless-stopped
     command: tunnel --no-autoupdate --url http://llm-proxy:8080
     depends_on:
-      - llm-proxy
+      llm-proxy:
+        condition: service_healthy
