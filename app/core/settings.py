@@ -1,6 +1,7 @@
+"""Application settings loaded from config.py."""
+
 from dataclasses import dataclass
-from pathlib import Path
-import os
+from typing import Any
 
 
 ALLOWED_REQUEST_FIELDS = {
@@ -10,24 +11,6 @@ ALLOWED_REQUEST_FIELDS = {
     "parallel_tool_calls", "response_format", "seed", "user",
     "logprobs", "top_logprobs",
 }
-
-
-def load_dotenv(path: Path) -> None:
-    """Tiny .env loader to keep dependencies minimal."""
-    if not path.exists():
-        return
-
-    for line in path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
-
-
-def parse_csv_env(name: str) -> list[str]:
-    raw = os.getenv(name, "")
-    return [item.strip() for item in raw.replace("\n", ",").split(",") if item.strip()]
 
 
 @dataclass(frozen=True)
@@ -43,29 +26,22 @@ class Settings:
     key_rate_limit_cooldown_seconds: float
 
     @classmethod
-    def from_env(cls, dotenv_path: str = ".env") -> "Settings":
-        load_dotenv(Path(dotenv_path))
-
-        deepseek_api_key = os.getenv("DEEPSEEK_API_KEY", "")
-        deepseek_api_keys = parse_csv_env("DEEPSEEK_API_KEYS")
-        if not deepseek_api_keys and deepseek_api_key:
-            deepseek_api_keys = [deepseek_api_key]
-
-        proxy_model_name = os.getenv("PROXY_MODEL_NAME", "deepseek-v4-pro")
-        proxy_model_aliases = parse_csv_env("PROXY_MODEL_ALIASES")
-        if not proxy_model_aliases:
-            proxy_model_aliases = [proxy_model_name]
+    def from_config(cls, config: Any) -> "Settings":
+        # proxy_model_aliases may be a list or comma-separated string
+        aliases = getattr(config, "PROXY_MODEL_ALIASES", [])
+        if isinstance(aliases, str):
+            aliases = [a.strip() for a in aliases.replace("\n", ",").split(",") if a.strip()]
 
         return cls(
-            deepseek_api_keys=deepseek_api_keys,
-            proxy_api_key=os.getenv("PROXY_API_KEY", ""),
-            deepseek_base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1").rstrip("/"),
-            deepseek_model=os.getenv("DEEPSEEK_MODEL", "deepseek-v4-pro"),
-            proxy_model_name=proxy_model_name,
-            proxy_model_aliases=proxy_model_aliases,
-            request_timeout=float(os.getenv("REQUEST_TIMEOUT", "300")),
-            max_reasoning_cache_items=int(os.getenv("MAX_REASONING_CACHE_ITEMS", "2000")),
-            key_rate_limit_cooldown_seconds=float(os.getenv("KEY_RATE_LIMIT_COOLDOWN_SECONDS", "60")),
+            deepseek_api_keys=getattr(config, "DEEPSEEK_API_KEYS", []),
+            proxy_api_key=getattr(config, "PROXY_API_KEY", ""),
+            deepseek_base_url=getattr(config, "DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1").rstrip("/"),
+            deepseek_model=getattr(config, "DEEPSEEK_MODEL", "deepseek-v4-pro"),
+            proxy_model_name=getattr(config, "PROXY_MODEL_NAME", "deepseek-v4-pro"),
+            proxy_model_aliases=aliases,
+            request_timeout=float(getattr(config, "REQUEST_TIMEOUT", "300")),
+            max_reasoning_cache_items=int(getattr(config, "MAX_REASONING_CACHE_ITEMS", "2000")),
+            key_rate_limit_cooldown_seconds=float(getattr(config, "KEY_RATE_LIMIT_COOLDOWN_SECONDS", "60")),
         )
 
     @property

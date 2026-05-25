@@ -18,7 +18,7 @@ llm-proxy/
 ├── main.py                     # 入口（兼容 uvicorn main:app）
 ├── run.sh                      # 一键启动脚本
 ├── test_proxy.sh               # 升级后回归检查脚本
-├── .env.example                # 配置模板
+├── config.example.py           # 配置模板
 ├── docker-compose.yml          # 代理 + Cloudflare 隧道
 ├── cloudflared/
 │   ├── config.example.yml      # 固定域名方案模板（当前默认不用）
@@ -38,8 +38,8 @@ llm-proxy/
 
 ```bash
 cd /home/lychee/workspace/llm-proxy
-cp .env.example .env
-# 编辑 .env
+cp config.example.py config.py
+# 编辑 config.py，填入你的 DeepSeek API keys
 ./run.sh
 ```
 
@@ -60,7 +60,7 @@ docker compose up -d llm-proxy
 docker compose logs -f llm-proxy
 ```
 
-会读取项目根目录的 `.env`，本机访问 `http://127.0.0.1:8080`。
+会通过 volume 挂载项目根目录的 `config.py`，本机访问 `http://127.0.0.1:8080`。
 
 ### 代理 + Cloudflare 临时公网（当前默认）
 
@@ -93,7 +93,7 @@ docker compose up -d llm-proxy
 docker run -d --name llm-proxy \
   --restart unless-stopped \
   -p 8080:8080 \
-  --env-file .env \
+  -v $(pwd)/config.py:/app/config.py:ro \
   llm-proxy:latest
 ```
 
@@ -108,23 +108,22 @@ API Key: proxy
 注意：
 
 - Cursor 的 API Key 填的是 `PROXY_API_KEY`，不是 DeepSeek 的真实 key。
-- 如果 Cursor 校验拦截 `deepseek-v4-pro`，可用外层别名（例如 `deepseek-v4-flash`），代理内部仍会转发到 `DEEPSEEK_MODEL=deepseek-v4-pro`。
+- 如果 Cursor 校验拦截 `deepseek-v4-pro`，可用外层别名（例如 `deepseek-v4-flash`），代理内部仍会转发到 `config.py` 中配置的模型。
 
-## 环境变量
+## 配置项（config.py）
 
-| 变量 | 说明 |
-| --- | --- |
-| `DEEPSEEK_API_KEY` | 单 key 模式 |
-| `DEEPSEEK_API_KEYS` | 多 key 模式（逗号分隔），优先级高于单 key |
-| `PROXY_API_KEY` | Cursor 侧填写的代理 key |
-| `DEEPSEEK_BASE_URL` | 上游 OpenAI 兼容地址 |
-| `DEEPSEEK_MODEL` | 实际上游模型（默认 `deepseek-v4-pro`） |
-| `PROXY_MODEL_NAME` | 代理暴露的主模型名 |
-| `PROXY_MODEL_ALIASES` | 代理暴露的额外模型名 |
-| `REQUEST_TIMEOUT` | 非流式超时（秒） |
-| `KEY_RATE_LIMIT_COOLDOWN_SECONDS` | key 限流后的冷却时间 |
-| `MAX_REASONING_CACHE_ITEMS` | reasoning 指纹缓存上限 |
-| `PORT` | 代理端口 |
+| 配置项 | 类型 | 说明 |
+| --- | --- | --- |
+| `DEEPSEEK_API_KEYS` | `list[str]` | DeepSeek API Key 列表，代理自动轮换 |
+| `PROXY_API_KEY` | `str` | Cursor 侧填写的代理 key |
+| `DEEPSEEK_BASE_URL` | `str` | 上游 OpenAI 兼容地址 |
+| `DEEPSEEK_MODEL` | `str` | 默认上游模型（`deepseek-v4-pro`） |
+| `PROXY_MODEL_NAME` | `str` | 代理暴露的主模型名 |
+| `PROXY_MODEL_ALIASES` | `list[str]` | 代理暴露的额外模型名 |
+| `REQUEST_TIMEOUT` | `float` | 非流式超时（秒） |
+| `KEY_RATE_LIMIT_COOLDOWN_SECONDS` | `float` | key 限流后的冷却时间 |
+| `MAX_REASONING_CACHE_ITEMS` | `int` | reasoning 指纹缓存上限 |
+| `PORT` | `int` | 代理端口 |
 
 ## 多 Key 限流轮换
 

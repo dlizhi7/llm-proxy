@@ -1,4 +1,5 @@
 .env
+config.py
 cloudflared/credentials.json
 cloudflared/config.yml
 .venv/

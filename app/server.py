@@ -8,6 +8,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 
+import config
 from app.core.logging_config import get_logger
 from app.core.settings import Settings
 from app.services.key_pool import ApiKeyPool, is_rate_limit_error
@@ -22,7 +23,7 @@ from app.services.reasoning_store import ReasoningStore
 
 
 def create_app() -> FastAPI:
-    settings = Settings.from_env()
+    settings = Settings.from_config(config)
     logger = get_logger()
     key_pool = ApiKeyPool(
         keys=settings.deepseek_api_keys,
