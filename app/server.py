@@ -251,7 +251,7 @@ def create_app() -> FastAPI:
         try:
             body = await request.json()
             cursor_model = body.get("model") or settings.proxy_model_name
-            san = sanitize_request_body(body, settings, reasoning_store, logger)
+            san = sanitize_request_body(body, cursor_model, settings, reasoning_store, logger)
         except Exception as exc:
             return JSONResponse(status_code=400, content={"error": {"message": str(exc)}})
 

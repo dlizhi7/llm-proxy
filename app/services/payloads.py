@@ -47,8 +47,19 @@ class SanitizedBody:
     assistant_position: int
 
 
+def resolve_upstream_model(cursor_model: str) -> str:
+    """Map Cursor-requested model to DeepSeek upstream model.
+
+    DeepSeek API uses the same names (deepseek-v4-pro / deepseek-v4-flash),
+    so we pass through directly. Unknown models fall back to v4-pro.
+    """
+    known = {"deepseek-v4-pro", "deepseek-v4-flash"}
+    return cursor_model if cursor_model in known else "deepseek-v4-pro"
+
+
 def sanitize_request_body(
     body: dict[str, Any],
+    cursor_model: str,
     settings: Settings,
     reasoning_store: ReasoningStore,
     logger: Logger,
@@ -66,7 +77,7 @@ def sanitize_request_body(
         else:
             stripped.append(key)
 
-    sanitized["model"] = settings.deepseek_model
+    sanitized["model"] = resolve_upstream_model(cursor_model)
 
     if "tools" in sanitized and isinstance(sanitized["tools"], list):
         sanitized["tools"] = normalize_cursor_tools(sanitized["tools"])
