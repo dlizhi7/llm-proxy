@@ -1,0 +1,21 @@
+# 永久域名模式 —— 覆盖 docker-compose.yml 中的 cloudflared 服务为命名隧道。
+#
+# 使用方式:
+#   1. 先运行 ./cloudflared/setup-fixed-tunnel.sh 初始化隧道和配置文件
+#   2. docker compose down                                    # 先停掉旧容器
+#   3. docker compose -f docker-compose.yml -f docker-compose.fixed.yml up -d
+#
+# 临时域名模式（直接 docker compose up -d）不受影响。
+
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared-fixed
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    volumes:
+      - ./cloudflared/config.yml:/etc/cloudflared/config.yml:ro
+      - ./cloudflared/credentials.json:/etc/cloudflared/credentials.json:ro
+    depends_on:
+      llm-proxy:
+        condition: service_healthy

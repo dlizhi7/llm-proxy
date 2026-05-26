@@ -19,10 +19,12 @@ llm-proxy/
 ├── run.sh                      # 一键启动脚本
 ├── test_proxy.sh               # 升级后回归检查脚本
 ├── config.example.py           # 配置模板
-├── docker-compose.yml          # 代理 + Cloudflare 隧道
+├── docker-compose.yml          # 代理 + Cloudflare 临时隧道（默认）
+├── docker-compose.fixed.yml    # 永久域名覆盖文件
 ├── cloudflared/
-│   ├── config.example.yml      # 固定域名方案模板（当前默认不用）
-│   └── README.md               # 临时隧道与升级说明
+│   ├── config.example.yml      # 永久域名隧道配置模板
+│   ├── setup-fixed-tunnel.sh   # 一键初始化固定隧道脚本
+│   └── README.md               # 双模式部署说明
 └── requirements.txt
 ```
 
@@ -51,7 +53,9 @@ curl http://localhost:8080/health
 
 ## Docker 部署
 
-### 仅代理
+项目支持两种公网暴露方式，详情见 [cloudflared/README.md](cloudflared/README.md)。
+
+### 仅代理（内网访问）
 
 ```bash
 cd /home/lychee/workspace/llm-proxy
@@ -60,31 +64,53 @@ docker compose up -d llm-proxy
 docker compose logs -f llm-proxy
 ```
 
-会通过 volume 挂载项目根目录的 `config.py`，本机访问 `http://127.0.0.1:8080`。
+本机访问 `http://127.0.0.1:8080`。
 
-### 代理 + Cloudflare 临时公网（当前默认）
+### 代理 + 临时域名（默认，无需 Cloudflare 账号）
 
-无需 Cloudflare 账号或 DNS，使用 Quick Tunnel（`*.trycloudflare.com`）。域名审批通过后再改固定域名，见 [cloudflared/README.md](cloudflared/README.md)。
+适合他人快速体验，每次启动生成随机 `*.trycloudflare.com` 域名。
 
 ```bash
 docker compose up -d
 docker compose logs -f cloudflared
 ```
 
-从日志复制临时 HTTPS 地址，Cursor Base URL 填 `https://<临时域名>/v1`。
-
-提取地址（可选）：
+从日志复制临时 HTTPS 地址：
 
 ```bash
 docker compose logs cloudflared 2>&1 | grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' | head -1
 ```
 
-**注意**：重建 `cloudflared` 容器后临时 URL 可能变化，需更新 Cursor 配置。
+> 重建 `cloudflared` 容器后临时 URL 可能变化，需更新 Cursor 配置。
 
-仅启动代理、不启隧道：
+### 代理 + 永久域名（需要 Cloudflare 账号 + DNS）
+
+适合长期使用，域名永远不变。
 
 ```bash
-docker compose up -d llm-proxy
+# 1. 一次性初始化
+./cloudflared/setup-fixed-tunnel.sh
+
+# 2. 按提示在 Cloudflare 控制台添加 DNS CNAME 记录
+
+# 3. 先停掉旧容器，再以永久域名模式启动
+docker compose down
+docker compose -f docker-compose.yml -f docker-compose.fixed.yml up -d
+docker compose logs -f cloudflared-fixed
+```
+
+验证：
+
+```bash
+curl https://你的域名/health
+# 应返回 {"status": "ok"}
+```
+
+切换回临时域名：
+
+```bash
+docker compose down
+docker compose up -d
 ```
 
 ### 手动 docker run（可选）

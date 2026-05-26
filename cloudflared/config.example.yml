@@ -1,9 +1,14 @@
-# NOT used by default compose (Quick Tunnel). For fixed domain after DNS is ready:
+# 永久域名隧道配置模板。
 #
-#   cp cloudflared/config.example.yml cloudflared/config.yml
-#   cp ~/.cloudflared/<TUNNEL_ID>.json cloudflared/credentials.json
-# Then switch cloudflared service in docker-compose.yml to named-tunnel mode
-# (see cloudflared/README.md).
+# 快速初始化: ./cloudflared/setup-fixed-tunnel.sh
+# 手动方式:
+#   1. cp cloudflared/config.example.yml cloudflared/config.yml
+#   2. cp ~/.cloudflared/<TUNNEL_ID>.json cloudflared/credentials.json
+#   3. 将 YOUR_TUNNEL_ID 和 llm-proxy.example.com 替换为实际值
+#
+# 启动: docker compose -f docker-compose.yml -f docker-compose.fixed.yml up -d
+#
+# 临时域名模式直接用 docker compose up -d，不需此文件。
 
 tunnel: YOUR_TUNNEL_ID
 credentials-file: /etc/cloudflared/credentials.json
